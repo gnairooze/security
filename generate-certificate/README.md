@@ -253,3 +253,8 @@ jarsigner -keystore code-signing.p12 -storetype PKCS12 myapp.jar "1"
 # Import certificate to keychain first, then sign
 codesign -s "Dev Code Signing Certificate" -v myapp.app
 ```
+
+## convert crt to pfx
+```bash
+openssl pkcs12 -export -out dev.test.pfx -inkey dev.test.key -in dev.test.crt
+```

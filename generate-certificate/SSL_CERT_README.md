@@ -130,3 +130,9 @@ pip install cryptography
 
 ### Browser Still Shows Warnings
 Make sure you've properly imported and trusted the certificate in your browser or system certificate store.
+
+
+## convert crt to pfx
+```bash
+openssl pkcs12 -export -out dev.test.pfx -inkey dev.test.key -in dev.test.crt
+```
