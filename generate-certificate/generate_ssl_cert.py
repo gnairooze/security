@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """
-Self-Signed SSL Certificate Generator for *.dev.test
+Self-Signed SSL Certificate Generator
 
 This script generates a self-signed SSL certificate and private key
-for the wildcard domain *.dev.test, suitable for local development.
+for any specified domain, suitable for local development and testing.
 
 Requirements:
     pip install cryptography
 
 Usage:
+    python generate_ssl_cert.py [options]
+    
+Examples:
     python generate_ssl_cert.py
+    python generate_ssl_cert.py --domain "*.example.com" --days 730
+    python generate_ssl_cert.py -d "localhost" -c "localhost.crt" -k "localhost.key"
 """
 
+import argparse
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -145,6 +151,54 @@ def generate_self_signed_cert(
     print("\nNote: This is a self-signed certificate for development use only!")
 
 
+def parse_arguments():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Generate self-signed SSL certificates for development",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s
+  %(prog)s --domain "*.example.com" --days 730
+  %(prog)s -d "localhost" -c "localhost.crt" -k "localhost.key"
+  %(prog)s --domain "api.myapp.local" --cert-file "api.crt" --key-file "api.key" --days 90
+        """
+    )
+    
+    parser.add_argument(
+        "-d", "--domain",
+        default="*.dev.test",
+        help="Domain name for the certificate (supports wildcards, default: *.dev.test)"
+    )
+    
+    parser.add_argument(
+        "-c", "--cert-file",
+        default="dev.test.crt",
+        help="Output certificate file name (default: dev.test.crt)"
+    )
+    
+    parser.add_argument(
+        "-k", "--key-file", 
+        default="dev.test.key",
+        help="Output private key file name (default: dev.test.key)"
+    )
+    
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=365,
+        help="Certificate validity period in days (default: 365)"
+    )
+    
+    parser.add_argument(
+        "-f", "--force",
+        action="store_true",
+        help="Overwrite existing files without prompting"
+    )
+    
+    return parser.parse_args()
+
+
 def check_dependencies():
     """Check if required dependencies are installed."""
     try:
@@ -161,24 +215,26 @@ def main():
     if not check_dependencies():
         sys.exit(1)
     
+    # Parse command-line arguments
+    args = parse_arguments()
+    
     print("Self-Signed SSL Certificate Generator")
     print("=" * 40)
-    
-    # You can customize these parameters
-    domain = "*.dev.test"
-    cert_file = "dev.test.crt"
-    key_file = "dev.test.key"
-    days_valid = 365
+    print(f"Domain: {args.domain}")
+    print(f"Certificate file: {args.cert_file}")
+    print(f"Private key file: {args.key_file}")
+    print(f"Validity period: {args.days} days")
+    print()
     
     # Check if files already exist
-    if os.path.exists(cert_file) or os.path.exists(key_file):
-        response = input(f"\nFiles {cert_file} or {key_file} already exist. Overwrite? (y/N): ")
+    if not args.force and (os.path.exists(args.cert_file) or os.path.exists(args.key_file)):
+        response = input(f"Files {args.cert_file} or {args.key_file} already exist. Overwrite? (y/N): ")
         if response.lower() != 'y':
             print("Aborted.")
             sys.exit(0)
     
     try:
-        generate_self_signed_cert(domain, cert_file, key_file, days_valid)
+        generate_self_signed_cert(args.domain, args.cert_file, args.key_file, args.days)
     except Exception as e:
         print(f"Error generating certificate: {e}")
         sys.exit(1)
