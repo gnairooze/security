@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-CA Certificate and Server Certificate Generator for *.dev.test
+CA Certificate and Server Certificate Generator
 
 This script generates:
 1. A Certificate Authority (CA) certificate and private key
-2. A server certificate signed by the CA for *.dev.test
+2. A server certificate signed by the CA for a specified domain
 
 The CA certificate can be imported into browsers as a trusted authority,
 eliminating security warnings for all certificates signed by this CA.
@@ -13,9 +13,23 @@ Requirements:
     pip install cryptography
 
 Usage:
+    python generate_ca_and_cert.py [options]
+    
+Examples:
+    # Use default values
     python generate_ca_and_cert.py
+    
+    # Specify custom domain
+    python generate_ca_and_cert.py --domain "*.example.com"
+    
+    # Specify custom file names
+    python generate_ca_and_cert.py --ca-cert my-ca.crt --ca-key my-ca.key
+    
+    # Full customization
+    python generate_ca_and_cert.py --domain "api.mysite.local" --ca-cert custom-ca.crt --ca-key custom-ca.key --server-cert api.crt --server-key api.key
 """
 
+import argparse
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -249,6 +263,86 @@ def generate_server_certificate(
     os.chmod(cert_file, 0o644)  # Certificate can be readable by others
 
 
+def parse_arguments():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Generate CA and server certificates for local development",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Use default values (domain: lb.dev.test)
+  %(prog)s
+  
+  # Specify custom domain
+  %(prog)s --domain "*.example.com"
+  
+  # Specify custom file names
+  %(prog)s --ca-cert my-ca.crt --ca-key my-ca.key
+  
+  # Full customization
+  %(prog)s --domain "api.mysite.local" \\
+           --ca-cert custom-ca.crt --ca-key custom-ca.key \\
+           --server-cert api.crt --server-key api.key \\
+           --ca-days 7300 --server-days 730
+
+Note: The CA certificate should be imported into your browser's trusted
+      certificate authorities to eliminate security warnings.
+        """
+    )
+    
+    parser.add_argument(
+        "--domain", "-d",
+        default="lb.dev.test",
+        help="Domain name for the server certificate (supports wildcards like *.example.com). Default: lb.dev.test"
+    )
+    
+    parser.add_argument(
+        "--ca-cert",
+        default="dev-test-ca.crt",
+        help="CA certificate output file name. Default: dev-test-ca.crt"
+    )
+    
+    parser.add_argument(
+        "--ca-key",
+        default="dev-test-ca.key",
+        help="CA private key output file name. Default: dev-test-ca.key"
+    )
+    
+    parser.add_argument(
+        "--server-cert",
+        default="dev.test.crt",
+        help="Server certificate output file name. Default: dev.test.crt"
+    )
+    
+    parser.add_argument(
+        "--server-key",
+        default="dev.test.key",
+        help="Server private key output file name. Default: dev.test.key"
+    )
+    
+    parser.add_argument(
+        "--ca-days",
+        type=int,
+        default=3650,
+        help="CA certificate validity period in days. Default: 3650 (10 years)"
+    )
+    
+    parser.add_argument(
+        "--server-days",
+        type=int,
+        default=365,
+        help="Server certificate validity period in days. Default: 365 (1 year)"
+    )
+    
+    parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Overwrite existing files without prompting"
+    )
+    
+    return parser.parse_args()
+
+
 def check_dependencies():
     """Check if required dependencies are installed."""
     try:
@@ -265,65 +359,69 @@ def main():
     if not check_dependencies():
         sys.exit(1)
     
+    # Parse command-line arguments
+    args = parse_arguments()
+    
     print("CA and Server Certificate Generator")
     print("=" * 40)
-    
-    # Configuration
-    ca_cert_file = "dev-test-ca.crt"
-    ca_key_file = "dev-test-ca.key"
-    server_domain = "lb.dev.test"
-    server_cert_file = "dev.test.crt"
-    server_key_file = "dev.test.key"
-    ca_days_valid = 3650  # 10 years
-    server_days_valid = 365  # 1 year
+    print(f"Domain: {args.domain}")
+    print(f"CA Certificate: {args.ca_cert}")
+    print(f"CA Private Key: {args.ca_key}")
+    print(f"Server Certificate: {args.server_cert}")
+    print(f"Server Private Key: {args.server_key}")
+    print(f"CA Valid for: {args.ca_days} days")
+    print(f"Server Valid for: {args.server_days} days")
+    print("=" * 40)
     
     # Check if files already exist
-    files_to_check = [ca_cert_file, ca_key_file, server_cert_file, server_key_file]
+    files_to_check = [args.ca_cert, args.ca_key, args.server_cert, args.server_key]
     existing_files = [f for f in files_to_check if os.path.exists(f)]
     
-    if existing_files:
+    if existing_files and not args.force:
         print(f"\nThe following files already exist: {', '.join(existing_files)}")
         response = input("Overwrite existing files? (y/N): ")
         if response.lower() != 'y':
             print("Aborted.")
             sys.exit(0)
+    elif existing_files and args.force:
+        print(f"\nOverwriting existing files: {', '.join(existing_files)}")
     
     try:
         # Generate CA certificate
         ca_cert, ca_private_key = generate_ca_certificate(
-            ca_cert_file, ca_key_file, ca_days_valid
+            args.ca_cert, args.ca_key, args.ca_days
         )
         
         # Generate server certificate signed by CA
         generate_server_certificate(
-            ca_cert, ca_private_key, server_domain, 
-            server_cert_file, server_key_file, server_days_valid
+            ca_cert, ca_private_key, args.domain, 
+            args.server_cert, args.server_key, args.server_days
         )
         
         print("\n" + "="*60)
         print("SSL Certificates generated successfully!")
         print("="*60)
-        print(f"CA Certificate: {ca_cert_file}")
-        print(f"CA Private Key: {ca_key_file}")
-        print(f"Server Certificate: {server_cert_file}")
-        print(f"Server Private Key: {server_key_file}")
-        print(f"Server Domain: {server_domain}")
-        print(f"CA Valid for: {ca_days_valid} days")
-        print(f"Server Valid for: {server_days_valid} days")
+        print(f"CA Certificate: {args.ca_cert}")
+        print(f"CA Private Key: {args.ca_key}")
+        print(f"Server Certificate: {args.server_cert}")
+        print(f"Server Private Key: {args.server_key}")
+        print(f"Server Domain: {args.domain}")
+        print(f"CA Valid for: {args.ca_days} days")
+        print(f"Server Valid for: {args.server_days} days")
         
         print("\nTo use with nginx, add these lines to your server block:")
-        print(f"    ssl_certificate     {os.path.abspath(server_cert_file)};")
-        print(f"    ssl_certificate_key {os.path.abspath(server_key_file)};")
+        print(f"    ssl_certificate     {os.path.abspath(args.server_cert)};")
+        print(f"    ssl_certificate_key {os.path.abspath(args.server_key)};")
         
         print(f"\nTo trust these certificates in Firefox:")
         print("1. Go to Settings → Privacy & Security → Certificates → View Certificates")
         print("2. Click 'Import' in the Authorities tab")
-        print(f"3. Select the CA certificate file: {ca_cert_file}")
+        print(f"3. Select the CA certificate file: {args.ca_cert}")
         print("4. Check 'Trust this CA to identify websites'")
         print("5. Restart Firefox")
         
         print(f"\nFor Chrome/Edge (Windows):")
-        print(f"1. Double-click the CA certificate file: {ca_cert_file}")
+        print(f"1. Double-click the CA certificate file: {args.ca_cert}")
         print("2. Click 'Install Certificate'")
         print("3. Choose 'Local Machine' → Next")
         print("4. Select 'Place all certificates in the following store'")
