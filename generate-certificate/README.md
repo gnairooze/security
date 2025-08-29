@@ -6,6 +6,12 @@ This directory contains Python scripts for generating different types of certifi
 2. **`generate_ca_and_cert.py`** - Generates a CA certificate and SSL server certificate (RECOMMENDED)
 3. **`generate_code_signing_cert.py`** - Generates a CA certificate and code signing certificate
 
+## example
+
+```bash
+python generate_ca_and_cert.py --domain "identity.dev.test" --ca-cert "identity-dev-test-ca.crt" --ca-key "identity-dev-test-ca.key" --server-cert "identity-dev-test.crt" --server-key "identity-dev-test.key" --ca-days 3660 --server-days 3660
+```
+
 ## Recommended Approach: CA + Server Certificate
 
 The `generate_ca_and_cert.py` script creates:
